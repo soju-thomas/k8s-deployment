@@ -17,6 +17,10 @@ spec:
           image: sojucr7/api
           ports:
             - containerPort: 5000
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
           env:
             - name: REDIS_HOST
               value: redis-cluster-ip-service

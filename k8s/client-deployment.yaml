@@ -15,5 +15,9 @@ spec:
       containers:
         - name: client
           image: sojucr7/client
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
           ports:
             - containerPort: 3000
