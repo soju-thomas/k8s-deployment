@@ -4,8 +4,14 @@ on:
   push:
     branches: [ main ]
 
+env:
+  CLUSTER_NAME: multi-k8s
+  CLUSTER_ZONE: asia-southeast1
+  PROJECT_ID: multi-k8s-497915
+  DEPLOYMENT_NAME: my-app
+
 jobs:
-  build-test-and-push:
+  build-test-and-deploy:
     runs-on: ubuntu-latest
 
     strategy:
@@ -56,3 +62,18 @@ jobs:
           tags: |
             ${{ matrix.docker_repo }}:latest
             ${{ matrix.docker_repo }}:${{ github.sha }}
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: Setup gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Get GKE credentials
+        run: |
+          gcloud container clusters get-credentials \
+          $CLUSTER_NAME \
+          --zone $CLUSTER_ZONE \
+          --project $PROJECT_ID
