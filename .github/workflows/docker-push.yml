@@ -1,17 +1,17 @@
-name: Build and deploy to GKE
+name: Build and Deploy to GKE
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
 
 env:
   CLUSTER_NAME: multi-k8s
   CLUSTER_ZONE: asia-southeast1
   PROJECT_ID: multi-k8s-497915
-  DEPLOYMENT_NAME: my-app
 
 jobs:
-  build-test-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
 
     strategy:
@@ -21,20 +21,24 @@ jobs:
           - name: gateway
             context: ./nginx
             docker_repo: sojucr7/gateway
+
           - name: client
             context: ./client
             docker_repo: sojucr7/client
+
           - name: worker
             context: ./worker
             docker_repo: sojucr7/worker
+
           - name: server
             context: ./server
             docker_repo: sojucr7/api
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Log in to Docker Hub
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -49,11 +53,15 @@ jobs:
           push: false
           tags: test-client:latest
 
-      - name: Run npm test (frontend only)
+      - name: Run frontend tests
         if: matrix.name == 'client'
-        run: docker run --rm -e CI=true test-client:latest npm test -- --watchAll=false
+        run: |
+          docker run --rm \
+          -e CI=true \
+          test-client:latest \
+          npm test -- --watchAll=false
 
-      - name: Build & push image
+      - name: Build and Push Docker image
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
@@ -62,6 +70,14 @@ jobs:
           tags: |
             ${{ matrix.docker_repo }}:latest
             ${{ matrix.docker_repo }}:${{ github.sha }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Authenticate to GCP
         uses: google-github-actions/auth@v2
@@ -75,5 +91,36 @@ jobs:
         run: |
           gcloud container clusters get-credentials \
           $CLUSTER_NAME \
-          --zone $CLUSTER_ZONE \
+          --region $CLUSTER_ZONE \
           --project $PROJECT_ID
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/
+
+      - name: Update gateway image
+        run: |
+          kubectl set image deployment/gateway \
+          gateway=sojucr7/gateway:${{ github.sha }}
+
+      - name: Update client image
+        run: |
+          kubectl set image deployment/client \
+          client=sojucr7/client:${{ github.sha }}
+
+      - name: Update worker image
+        run: |
+          kubectl set image deployment/worker \
+          worker=sojucr7/worker:${{ github.sha }}
+
+      - name: Update server image
+        run: |
+          kubectl set image deployment/server \
+          server=sojucr7/api:${{ github.sha }}
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/gateway
+          kubectl rollout status deployment/client
+          kubectl rollout status deployment/worker
+          kubectl rollout status deployment/server
