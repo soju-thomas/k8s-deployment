@@ -86,6 +86,10 @@ jobs:
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
+      
+      - name: Install GKE auth plugin
+        run: |
+          gcloud components install gke-gcloud-auth-plugin --quiet
 
       - name: Get GKE credentials
         run: |
@@ -98,29 +102,24 @@ jobs:
         run: |
           kubectl apply -f k8s/
 
-      - name: Update gateway image
-        run: |
-          kubectl set image deployment/gateway \
-          gateway=sojucr7/gateway:${{ github.sha }}
-
       - name: Update client image
         run: |
-          kubectl set image deployment/client \
+          kubectl set image deployment/client-deployment \
           client=sojucr7/client:${{ github.sha }}
 
       - name: Update worker image
         run: |
-          kubectl set image deployment/worker \
+          kubectl set image deployment/worker-deployment \
           worker=sojucr7/worker:${{ github.sha }}
 
       - name: Update server image
         run: |
-          kubectl set image deployment/server \
+          kubectl set image deployment/server-deployment \
           server=sojucr7/api:${{ github.sha }}
 
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/gateway
           kubectl rollout status deployment/client
-          kubectl rollout status deployment/worker
-          kubectl rollout status deployment/server
+          kubectl rollout status deployment/worker-deployment
+          kubectl rollout status deployment/server-deployment
