@@ -119,7 +119,6 @@ jobs:
 
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/gateway
-          kubectl rollout status deployment/client
+          kubectl rollout status deployment/client-deployment
           kubectl rollout status deployment/worker-deployment
           kubectl rollout status deployment/server-deployment
